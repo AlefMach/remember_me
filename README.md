@@ -29,9 +29,12 @@ RememberMe.guard("text_deleted", %{"user" => "Foo", "text" => "A any message"}, 
 # Retrieve a previously stored value using the key
 value = RememberMe.find_value("text_deleted")
 # Result: %{"user" => "Foo", "text" => "A any message"}
-Scheduling Function Execution
 ```
-### Schedule a function for execution after a certain time
+
+## Scheduling Function Execution
+
+Schedule a function for execution after a certain time
+
 ```elixir
 RememberMe.exec_func(fn -> IO.puts "Hello World!" end, [sec: 10, repeat: 3])
 # Result: :ok
