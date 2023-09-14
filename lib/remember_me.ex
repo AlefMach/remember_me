@@ -153,7 +153,7 @@ defmodule RememberMe do
     end
   end
 
-  defp get_repeat(opts) do
+  defp get_repeat(repeat) do
     case repeat do
       [] ->
         1
