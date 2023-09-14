@@ -154,12 +154,6 @@ defmodule RememberMe do
   end
 
   defp get_repeat(opts) do
-    repeat =
-      opts
-      |> Keyword.delete(:sec)
-      |> Keyword.delete(:min)
-      |> Keyword.delete(:hour)
-
     case repeat do
       [] ->
         1
