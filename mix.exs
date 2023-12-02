@@ -38,7 +38,7 @@ defmodule RememberMe.MixProject do
     [
       files: ["lib", "mix.exs", "README.md", "Changelog.md"],
       maintainers: ["Alef Machado"],
-      licenses: ["MIT License"],
+      licenses: ["MIT"],
       links: %{
         "GitHub" => "https://github.com/AlefMach/remember_me",
         "Docs" => "https://hexdocs.pm/remember_me/"

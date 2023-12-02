@@ -13,6 +13,7 @@ defmodule RememberMe do
       {:remember_me, "~> 0.0.1"}
     ]
   end
+  ```
 
   ## Examples
     iex> RememberMe.guard("text_deleted", %{"user" => "Foo", "text" => "A any message"}, min: 2)
