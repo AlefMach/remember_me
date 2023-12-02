@@ -30,7 +30,6 @@ defmodule RememberMe.Jobs.ScheduleJob do
 
     list_fun = Enum.map(1..repeat, fn _a -> fun end) ++ [time: time]
 
-
     current_fun = Enum.at(list_fun, 0)
 
     current_fun.()

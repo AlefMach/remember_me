@@ -36,11 +36,13 @@ defmodule RememberMe.MixProject do
 
   defp package do
     [
-     files: ["lib", "mix.exs", "README.md"],
-     maintainers: ["Alef Machado"],
-     licenses: ["Apache 2.0"],
-     links: %{"GitHub" => "https://github.com/AlefMach/remember_me",
-              "Docs" => "https://hexdocs.pm/remember_me/"}
-     ]
+      files: ["lib", "mix.exs", "README.md"],
+      maintainers: ["Alef Machado"],
+      licenses: ["Apache 2.0"],
+      links: %{
+        "GitHub" => "https://github.com/AlefMach/remember_me",
+        "Docs" => "https://hexdocs.pm/remember_me/"
+      }
+    ]
   end
 end
