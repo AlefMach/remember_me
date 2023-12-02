@@ -3,7 +3,7 @@ defmodule RememberMe.Utils.DetectTime do
 
   defmodule KeyError do
     @moduledoc false
-    defexception message: "The argument in opts must be one of these [sec: 60, min: 60, hour: 1]"
+    defexception message: "The argument in opts must be one of these [sec: n, min: x, hour: z]"
   end
 
   @spec time(keyword) :: non_neg_integer
@@ -23,7 +23,8 @@ defmodule RememberMe.Utils.DetectTime do
       :hour ->
         :timer.hours(Keyword.get(opts, key))
 
-      _ -> raise KeyError
+      _ ->
+        raise KeyError
     end
   end
 

@@ -133,7 +133,7 @@ defmodule RememberMe do
   def exec_func(fun, opts \\ []) when validate_params_fun(fun, opts) do
     time =
       opts
-      |> Keyword.delete(:repeat)
+      |> get_time()
       |> DetectTime.time()
 
     repeat = get_repeat(opts)
@@ -153,13 +153,23 @@ defmodule RememberMe do
     end
   end
 
-  defp get_repeat(repeat) do
-    case repeat do
-      [] ->
-        1
+  defp get_time([{:sec, _} = value | _tail]), do: [value]
 
-      _ ->
-        Keyword.get(repeat, :repeat)
-    end
-  end
+  defp get_time([{:min, _} = value | _tail]), do: [value]
+
+  defp get_time([{:hour, _} = value | _tail]), do: [value]
+
+  defp get_time([{:repeat, _} | tail]), do: get_time(tail)
+
+  defp get_time([{_, _} | _]), do: raise("No valid specified time")
+
+  defp get_time(_), do: []
+
+  defp get_repeat(opts) when length(opts) > 0, do: opts |> Keyword.get(:repeat) |> validate_key()
+
+  defp get_repeat(_), do: raise("Need to be a list")
+
+  defp validate_key(value) when not is_nil(value), do: value
+
+  defp validate_key(_), do: raise("Key passed as a parameter must be repeat: x")
 end
