@@ -52,7 +52,7 @@ file:
 ```elixir
 defp deps do
   [
-    {:remember_me, "~> 0.0.1"}
+    {:remember_me, "~> 0.0.2"}
   ]
 end
 ```
