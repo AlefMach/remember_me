@@ -1,150 +1,121 @@
 # RememberMe
 
-![](logo.jpg#vitrinedev)
+![RememberMe logo](logo.jpg)
 
-RememberMe is a robust but simple state memory machine organizer. It operates similar to Redis, but with the added capability to schedule and define the number of times a function will be executed, and of course, save any values associated with an assimilated key.
+RememberMe is a small in-memory store and delayed-function scheduler for Elixir applications. Store a value under a string key with a TTL, retrieve or manage it while it is alive, and schedule a zero-arity function to run at a fixed interval.
 
-## Table of Contents
-- Introduction
-- Examples
-- Installation
-- Usage
-- Contributing
-- License
+It is useful for short-lived, process-local application state—not as a replacement for a persistent database or a distributed cache.
 
-## Introduction
+## Contents
 
-RememberMe is a utility module that provides an efficient and user-friendly way to manage state memory. It allows you to store and retrieve data using keys, schedule functions for execution, and more. It's particularly useful for scenarios where you need to handle state persistence and time-based function execution.
-
-## Examples
-### Storing Values
-```elixir
-# Store a value in memory with a key
-RememberMe.guard("text_deleted", %{"user" => "Foo", "text" => "A any message"}, min: 2)
-# Result: :ok
-```
-
-### Retrieving Values
-```elixir
-# Retrieve a previously stored value using the key
-value = RememberMe.find_value("text_deleted")
-# Result: %{"user" => "Foo", "text" => "A any message"}
-```
-
-### Deleting Values
-
-```elixir
-# Delete a value before its expiration
-RememberMe.delete_value("text_deleted")
-# Result: :ok
-```
-
-### Listing Active Keys and Updating Expiration
-
-```elixir
-RememberMe.list_keys()
-# Result: ["text_deleted"]
-
-# Keep the stored value and extend its expiration
-RememberMe.update_ttl("text_deleted", min: 5)
-# Result: :ok
-```
-
-## Scheduling Function Execution
-
-Schedule a function for execution after a certain time
-
-```elixir
-RememberMe.exec_func(fn -> IO.puts "Hello World!" end, [sec: 10, repeat: 3])
-# Result: :ok
-# Output:
-# Hello World!
-# Hello World!
-# ... (repeated three times)
-```
+- [Installation](#installation)
+- [Memory with TTL](#memory-with-ttl)
+- [Scheduling functions](#scheduling-functions)
+- [Time options and validation](#time-options-and-validation)
+- [Logging](#logging)
+- [Telemetry](#telemetry)
+- [Notes and limitations](#notes-and-limitations)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Installation
 
-RememberMe can be installed by adding it as a dependency in your `mix.exs`
-file:
+Add `remember_me` to your dependencies:
 
 ```elixir
 defp deps do
   [
-    {:remember_me, "~> 0.0.2"}
+    {:remember_me, "~> 1.0.4"}
   ]
 end
 ```
 
-After adding the dependency, run `mix deps.get`` to fetch and install it.
+Then fetch dependencies:
 
-## Usage
-
-RememberMe provides the following functions for managing memory and function execution:
-
-### guard/3
-This function stores a value in memory using a key and optional options for time duration.
-
-```elixir
-RememberMe.guard(name_state, value, opts \\ [])
-```
-- `name_state`: The key used to identify the stored value.
-- `value`: The data you want to store.
-- `opts`: Additional options (e.g., min, sec, hour) to define the time 
-duration the value should be stored.
-
-### find_value/1
-
-This function retrieves a previously stored value from memory using a key.
-
-```elixir
-RememberMe.find_value(name_state)
-```
-- `name_state`: The key used to identify the stored value.
-
-### delete_value/1
-
-This function removes a value from memory before its configured expiration. It is
-safe to call when the key does not exist.
-
-```elixir
-RememberMe.delete_value(name_state)
+```sh
+mix deps.get
 ```
 
-- `name_state`: The key used to identify the stored value.
+RememberMe starts with your application; no manual process setup is required.
 
-### list_keys/0
+## Memory with TTL
 
-Returns the active memory keys in alphabetical order.
+### Store and retrieve a value
 
-### update_ttl/2
-
-Changes a value's expiration without replacing it. It returns
-`{:error, :not_found}` if the key does not exist.
+`guard/3` stores any non-function value under a string key. A subsequent call with the same key replaces both the value and its expiration timer.
 
 ```elixir
-RememberMe.update_ttl(name_state, min: 5)
+RememberMe.guard("deleted_message", %{"author" => "Foo", "body" => "Hello"}, min: 2)
+# => :ok
+
+RememberMe.find_value("deleted_message")
+# => %{"author" => "Foo", "body" => "Hello"}
 ```
 
-### exec_func/2
+The value is returned as `nil` when the key is absent or has expired. If no time option is supplied, the TTL is three minutes.
 
-This function schedules a function for execution after a specified time and optionally defines the number of times the function should be repeated.
+### Delete a value early
 
 ```elixir
-RememberMe.exec_func(fun, opts \\ [])
+RememberMe.delete_value("deleted_message")
+# => :ok
 ```
-- `fun`: The function you want to schedule for execution.
-- `opts`: Additional options (e.g., min, sec, hour, repeat) to define the execution time and repetition count of the function.
 
-For more information on available options and usage examples, refer to the Examples section above.
+Deleting a missing key is safe and also returns `:ok`.
+
+### List keys
+
+```elixir
+RememberMe.list_keys()
+# => ["deleted_message"]
+```
+
+`list_keys/0` returns all active keys in alphabetical order.
+
+### Extend or replace the TTL
+
+`update_ttl/2` changes only a key's expiration; its stored value remains untouched.
+
+```elixir
+RememberMe.update_ttl("deleted_message", min: 5)
+# => :ok
+
+RememberMe.update_ttl("missing_key", sec: 10)
+# => {:error, :not_found}
+```
+
+## Scheduling functions
+
+`exec_func/2` runs a zero-arity function after the chosen interval. Set `:repeat` to run it again at the same interval; it defaults to `1`.
+
+```elixir
+RememberMe.exec_func(
+  fn -> IO.puts("Hello, world!") end,
+  sec: 10,
+  repeat: 3
+)
+# => :ok
+```
+
+The function above runs after 10 seconds, then twice more at 10-second intervals. A function that raises is logged and reported through telemetry; later scheduled runs still continue.
+
+## Time options and validation
+
+The APIs that accept a time (`guard/3`, `update_ttl/2`, and `exec_func/2`) accept one of the following keyword options:
+
+| Option | Meaning | Example |
+| --- | --- | --- |
+| `:sec` | seconds | `sec: 30` |
+| `:min` | minutes | `min: 5` |
+| `:hour` | hours | `hour: 1` |
+
+Time values must be positive integers. Provide at most one time option; omitting it uses the three-minute default. For `exec_func/2`, `:repeat` must be a positive integer.
 
 ## Logging
 
-The library logs memory saves and deletions, as well as scheduled-function lifecycle
-events. Log metadata includes the key, expiration reason, interval, and repeat count;
-stored values are intentionally not logged.
+RememberMe logs memory saves, deletions, TTL updates, and scheduled-function lifecycle events. Log metadata includes operational data such as a key, TTL, interval, repeat count, and expiration reason; stored values are never logged.
 
-To disable all RememberMe logs, add this to your application's `config/config.exs`:
+To disable its logs, add the following to `config/config.exs`:
 
 ```elixir
 config :remember_me, log_enabled: false
@@ -152,21 +123,30 @@ config :remember_me, log_enabled: false
 
 ## Telemetry
 
-RememberMe emits standard `:telemetry` events. Values stored in memory are never
-included in event metadata.
+RememberMe emits standard `:telemetry` events. Stored values are never included in metadata.
 
 | Event | Measurements | Metadata |
 | --- | --- | --- |
 | `[:remember_me, :memory, :saved]` | `ttl_ms` | `key` |
 | `[:remember_me, :memory, :ttl_updated]` | `ttl_ms` | `key` |
-| `[:remember_me, :memory, :deleted]` | `count` | `key`, `reason` |
+| `[:remember_me, :memory, :deleted]` | `count` | `key`, `reason` (`:manual` or `:expired`) |
 | `[:remember_me, :schedule, :scheduled]` | `interval_ms` | `repeat` |
 | `[:remember_me, :schedule, :execution, :started]` | `count` | `remaining` |
 | `[:remember_me, :schedule, :execution, :failed]` | `count` | `remaining`, `error` |
 | `[:remember_me, :schedule, :completed]` | `count` | — |
 
-# Contributing
-Contributions are welcome! If you encounter any issues or have suggestions for improvements, please feel free to open an issue or submit a pull request on the [GitHub repository](https://github.com/AlefMach/remember_me).
+Attach handlers with `:telemetry.attach/4` or your preferred telemetry integration.
 
-# License
-This project is licensed under the MIT License.
+## Notes and limitations
+
+- Values live only in RAM on the current Erlang node. They are lost when the application stops and are not shared between nodes.
+- Expiration and scheduled execution are best-effort timers; they are intended for application-level timing, not durable job processing.
+- Keys must be strings, and scheduled functions must have arity zero.
+
+## Contributing
+
+Issues and pull requests are welcome at [AlefMach/remember_me](https://github.com/AlefMach/remember_me).
+
+## License
+
+Released under the [MIT License](LICENSE).

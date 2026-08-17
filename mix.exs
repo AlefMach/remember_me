@@ -4,7 +4,7 @@ defmodule RememberMe.MixProject do
   def project do
     [
       app: :remember_me,
-      version: "0.0.3",
+      version: "1.0.4",
       elixir: "~> 1.15",
       start_permanent: Mix.env() == :prod,
       description: description(),
