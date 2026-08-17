@@ -4,7 +4,7 @@ defmodule RememberMe.MixProject do
   def project do
     [
       app: :remember_me,
-      version: "0.0.2",
+      version: "0.0.3",
       elixir: "~> 1.15",
       start_permanent: Mix.env() == :prod,
       description: description(),
@@ -30,7 +30,8 @@ defmodule RememberMe.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
+      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
+      {:telemetry, "~> 1.2"}
     ]
   end
 

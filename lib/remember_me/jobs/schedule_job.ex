@@ -3,68 +3,48 @@ defmodule RememberMe.Jobs.ScheduleJob do
 
   use GenServer
 
-  require Logger
+  alias RememberMe.{Logging, Telemetry}
 
   def start_link(params), do: GenServer.start_link(__MODULE__, params)
 
   @impl true
   @spec init(Map) :: {:ok, any}
   def init(state) do
-    time = state.time
+    Logging.info("function_scheduled", interval_ms: state.time, repeat: state.repeat)
 
-    # Schedule work to be performed on start
-    schedule_work(time)
+    Telemetry.execute([:schedule, :scheduled], %{interval_ms: state.time}, %{repeat: state.repeat})
 
-    {:ok, state}
+    schedule_work(state.time)
+    {:ok, Map.put(state, :remaining, state.repeat)}
   end
 
   @impl true
-  def handle_info(:work, state), do: exec_job(state)
+  def handle_info(:work, %{remaining: remaining} = state) do
+    Logging.info("function_execution_started", remaining: remaining)
+    Telemetry.execute([:schedule, :execution, :started], %{count: 1}, %{remaining: remaining})
+    safely_execute(state.fun, remaining)
+
+    if remaining == 1 do
+      Logging.info("function_execution_completed")
+      Telemetry.execute([:schedule, :completed], %{count: 1}, %{})
+      {:stop, :normal, state}
+    else
+      schedule_work(state.time)
+      {:noreply, %{state | remaining: remaining - 1}}
+    end
+  end
 
   defp schedule_work(time), do: Process.send_after(self(), :work, time)
 
-  defp exec_job(state) when is_map(state) do
-    time = state.time
-    repeat = state.repeat
-    fun = state.fun
+  defp safely_execute(fun, remaining) do
+    fun.()
+  rescue
+    exception ->
+      Logging.error("function_execution_failed", error: Exception.message(exception))
 
-    list_fun = Enum.map(1..repeat, fn _a -> fun end) ++ [time: time]
-
-    current_fun = Enum.at(list_fun, 0)
-
-    current_fun.()
-
-    Logger.info("Started execute function")
-
-    state =
-      list_fun
-      |> Enum.sort()
-      |> Enum.drop(1)
-
-    schedule_work(time)
-
-    {:noreply, state}
-  end
-
-  defp exec_job(state) when is_list(state) do
-    time = Keyword.get(state, :time)
-
-    current_fun = Enum.at(state, 0)
-
-    if is_function(current_fun) do
-      current_fun.()
-
-      state =
-        state
-        |> Enum.sort()
-        |> Enum.drop(1)
-
-      schedule_work(time)
-
-      {:noreply, state}
-    else
-      Logger.info("Finish Execute function")
-      {:noreply, []}
-    end
+      Telemetry.execute([:schedule, :execution, :failed], %{count: 1}, %{
+        remaining: remaining,
+        error: Exception.message(exception)
+      })
   end
 end

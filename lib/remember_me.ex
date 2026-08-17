@@ -27,19 +27,16 @@ defmodule RememberMe do
 
     iex> RememberMe.exec_func(fn -> IO.puts "Hello World!" end, [sec: 10, repeat: 3])
     :ok
-    Hello World!
 
-    20:13:59.336 [info] Started execute function
+    20:13:59.336 [info] function_scheduled
+    20:14:09.336 [info] function_execution_started
     Hello World!
-    Hello World!
-    20:14:29.342 [info] Finish Execute function
-    iex>
 
 
     Important to note that if no opts are passed, the default value for time will be 3 minutes and the repeat will default to 1 time.
   """
   alias RememberMe.Utils.DetectTime
-  alias RememberMe.Jobs.{Information, InformationJob, ScheduleJob}
+  alias RememberMe.Jobs.{Information, ScheduleJob}
 
   @spec validate_params_guard(String.t(), any(), Atom) ::
           {:__block__ | {:., [], [:andalso | :erlang, ...]}, [],
@@ -73,23 +70,10 @@ defmodule RememberMe do
 
   Note that if you pass a key equal to the previous one to the guard(), it will simply replace the value with the current value.
   """
-  @spec guard(binary, any(), keyword) :: :ignore | {:error, any} | :ok
+  @spec guard(binary(), any(), keyword()) :: :ok
   def guard(name_state, value, opts \\ []) when validate_params_guard(name_state, value, opts) do
     time = DetectTime.time(opts)
-
-    params_gen = %{
-      time: time,
-      name_state: name_state
-    }
-
-    case InformationJob.start_link(params_gen) do
-      {:ok, _} ->
-        Information.guard_value(name_state, value)
-        :ok
-
-      err ->
-        err
-    end
+    Information.put_value(name_state, value, time)
   end
 
   @doc """
@@ -111,6 +95,40 @@ defmodule RememberMe do
   def find_value(name_state) when is_binary(name_state), do: Information.get_value(name_state)
 
   @doc """
+  Deletes a value from memory before its configured expiration.
+
+  It is safe to call this function when the key does not exist.
+
+  ## Examples
+
+      iex> RememberMe.delete_value("text_deleted")
+      :ok
+  """
+  @spec delete_value(binary()) :: :ok
+  def delete_value(name_state) when is_binary(name_state), do: Information.delete_info(name_state)
+
+  @doc """
+  Lists the active memory keys in alphabetical order.
+  """
+  @spec list_keys() :: [binary()]
+  def list_keys, do: Information.keys()
+
+  @doc """
+  Changes a value's expiration without replacing the value.
+
+  It returns `{:error, :not_found}` when the key is not stored.
+
+  ## Examples
+
+      iex> RememberMe.update_ttl("text_deleted", min: 5)
+      :ok
+  """
+  @spec update_ttl(binary(), keyword()) :: :ok | {:error, :not_found}
+  def update_ttl(name_state, opts) when is_binary(name_state) and is_list(opts) do
+    Information.update_ttl(name_state, DetectTime.time(opts))
+  end
+
+  @doc """
   will queue a specified amount of functions in memory to be executed in the given time
 
   ## Parameters
@@ -122,15 +140,11 @@ defmodule RememberMe do
 
     iex> RememberMe.exec_func(fn -> IO.puts "Hello World!" end, [sec: 10, repeat: 3])
     :ok
+    20:13:59.336 [info] function_scheduled
+    20:14:09.336 [info] function_execution_started
     Hello World!
-
-    20:13:59.336 [info] Started execute function
-    Hello World!
-    Hello World!
-    20:14:29.342 [info] Finish Execute function
-    iex>
   """
-  @spec exec_func(fun, maybe_improper_list) :: :ignore | :ok | {:error, any}
+  @spec exec_func(function(), keyword()) :: :ok
   def exec_func(fun, opts \\ []) when validate_params_fun(fun, opts) do
     time =
       opts
@@ -166,11 +180,10 @@ defmodule RememberMe do
 
   defp get_time(_), do: []
 
-  defp get_repeat(opts) when length(opts) > 0, do: opts |> Keyword.get(:repeat) |> validate_key()
-
-  defp get_repeat(_), do: raise("Need to be a list")
-
-  defp validate_key(value) when not is_nil(value), do: value
-
-  defp validate_key(_), do: raise("Key passed as a parameter must be repeat: x")
+  defp get_repeat(opts) do
+    case Keyword.get(opts, :repeat, 1) do
+      repeat when is_integer(repeat) and repeat > 0 -> repeat
+      _ -> raise ArgumentError, "repeat must be a positive integer"
+    end
+  end
 end
